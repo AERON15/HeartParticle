@@ -254,22 +254,36 @@
     ctx.stroke();
   }
 
-  // Comet trail: draws fading sparkle stamps from tail to head
-  function drawCometTrail(trailPoints, baseSize, baseAlpha, useBlurred) {
-    const tex = useBlurred ? sparkleImgBlurred : sparkleImg;
+  // Comet trail: smooth tapered stroke from tail to glowing head
+  function drawCometTrail(trailPoints, headSize, baseAlpha, color) {
     const len = trailPoints.length;
-    for (let i = len - 1; i >= 0; i--) {
-      const frac = 1 - (i / (len - 1));            // 1.0 at head, 0.0 at tail
-      const size = baseSize * (0.15 + 0.85 * frac); // tapers more toward tail
-      const alpha = baseAlpha * Math.sqrt(frac);     // sqrt falloff (gentler, more visible tail)
+    if (len < 2) return;
+
+    // Draw tapered trail as segments with decreasing width & alpha
+    ctx.lineCap = 'round';
+    for (let i = len - 2; i >= 0; i--) {
+      const frac = 1 - (i / (len - 1));          // 1.0 at head, 0.0 at tail
+      const width = headSize * (0.1 + 0.9 * frac);
+      const alpha = baseAlpha * frac * frac;
       if (alpha < 0.005) continue;
+
       ctx.globalAlpha = alpha;
-      ctx.drawImage(tex,
-        trailPoints[i].x - size * 5,
-        trailPoints[i].y - size * 5,
-        size * 10, size * 10
-      );
+      ctx.strokeStyle = color || globalColorGrad;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(trailPoints[i + 1].x, trailPoints[i + 1].y);
+      ctx.lineTo(trailPoints[i].x, trailPoints[i].y);
+      ctx.stroke();
     }
+
+    // Bright glowing head
+    const head = trailPoints[0];
+    ctx.globalAlpha = baseAlpha;
+    ctx.drawImage(sparkleImg,
+      head.x - headSize * 4,
+      head.y - headSize * 4,
+      headSize * 8, headSize * 8
+    );
   }
 
   function drawBackground(t) {
@@ -494,13 +508,12 @@
   function drawFibonacciSpirals(t) {
     const numArms = 4;
     const particlesPerArm = 16;
-    const TRAIL_COUNT = 8;
-    const TRAIL_DT = 0.1;
+    const TRAIL_COUNT = 12;
+    const TRAIL_DT = 0.05;
     const dm = depthMult(DEPTH.fibonacciSpirals);
 
     for (let arm = 0; arm < numArms; arm++) {
       for (let i = 0; i < particlesPerArm; i++) {
-        // Build trail by evaluating position at past times
         const trail = [];
         for (let ti = 0; ti < TRAIL_COUNT; ti++) {
           trail.push(getFibonacciPos(arm, i, numArms, particlesPerArm, t - ti * TRAIL_DT));
@@ -509,18 +522,10 @@
         const head = trail[0];
         const progress = head.progress;
         const pulse = 0.6 + 0.4 * Math.sin(progress * Math.PI * 3 + t * 0.5 + arm);
-        const size = (2.5 + progress * 2) * pulse * dm.size;
-        const alpha = (0.60 + 0.25 * Math.sin(i * 0.8 + t * 0.4)) * pulse * dm.alpha;
+        const size = (2 + progress * 1.5) * pulse * dm.size;
+        const alpha = (0.50 + 0.25 * Math.sin(i * 0.8 + t * 0.4)) * pulse * dm.alpha;
 
-        // Draw comet trail
-        drawCometTrail(trail, size, alpha, dm.blurred);
-
-        // Bright head dot
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = globalColorGrad;
-        ctx.beginPath();
-        ctx.arc(head.x, head.y, size, 0, Math.PI * 2);
-        ctx.fill();
+        drawCometTrail(trail, size, alpha, null);
       }
     }
   }
@@ -687,13 +692,12 @@
   function drawOrbitalSparkles(t) {
     const numOrbits = 3;
     const particlesPerOrbit = 4;
-    const TRAIL_COUNT = 10;
-    const TRAIL_DT = 0.12;
+    const TRAIL_COUNT = 14;
+    const TRAIL_DT = 0.06;
     const dm = depthMult(DEPTH.orbitalSparkles);
 
     for (let orbit = 0; orbit < numOrbits; orbit++) {
       for (let p = 0; p < particlesPerOrbit; p++) {
-        // Build trail by evaluating position at past times
         const trail = [];
         for (let ti = 0; ti < TRAIL_COUNT; ti++) {
           trail.push(getOrbitalPos(orbit, p, numOrbits, particlesPerOrbit, t - ti * TRAIL_DT));
@@ -702,9 +706,9 @@
         const head = trail[0];
         const velocity = Math.sqrt(2 / head.r - 1 / head.a);
         const brightness = 0.3 + velocity * 0.3;
-        const size = (1.5 + brightness * 1.5) * dm.size;
+        const size = (1.5 + brightness) * dm.size;
 
-        drawCometTrail(trail, size, (brightness * 0.7) * dm.alpha, dm.blurred);
+        drawCometTrail(trail, size, brightness * 0.6 * dm.alpha, null);
       }
     }
   }
