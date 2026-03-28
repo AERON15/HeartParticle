@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heart Particle — Generative Art</title>
+  <meta name="description" content="A glowing, ethereal heart made of thousands of neon green particles with geometric web structure and bloom effects.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="scene">
+    <canvas id="nebula-canvas"></canvas>
+    <canvas id="heart"></canvas>
+  </div>
+  
+  <div class="grain-overlay"></div>
+  <div class="cinematic-overlays"></div>
+
+  <!-- Cinematic post-processing SVG filter -->
+  <svg style="display: none;">
+    <defs>
+      <filter id="chromatic-aberration" x="-10%" y="-10%" width="120%" height="120%">
+        <!-- Shift red channel slightly left -->
+        <feColorMatrix type="matrix" in="SourceGraphic" 
+          values="1 0 0 0 0  
+                  0 0 0 0 0  
+                  0 0 0 0 0  
+                  0 0 0 1 0" result="RED" />
+        <feOffset dx="-0.8" dy="0" in="RED" result="RED_SHIFT" />
+
+        <!-- Keep green channel centered -->
+        <feColorMatrix type="matrix" in="SourceGraphic" 
+          values="0 0 0 0 0  
+                  0 1 0 0 0  
+                  0 0 0 0 0  
+                  0 0 0 1 0" result="GREEN" />
+
+        <!-- Shift blue channel slightly right -->
+        <feColorMatrix type="matrix" in="SourceGraphic" 
+          values="0 0 0 0 0  
+                  0 0 0 0 0  
+                  0 0 1 0 0  
+                  0 0 0 1 0" result="BLUE" />
+        <feOffset dx="0.8" dy="0" in="BLUE" result="BLUE_SHIFT" />
+
+        <!-- Blend them together -->
+        <feBlend mode="screen" in="RED_SHIFT" in2="GREEN" result="RG" />
+        <feBlend mode="screen" in="RG" in2="BLUE_SHIFT" result="FINAL" />
+      </filter>
+    </defs>
+  </svg>
+
+  <script src="nebula.js"></script>
+  <script> initNebula('nebula-canvas'); </script>
+  <script src="script.js"></script>
+</body>
+</html>
