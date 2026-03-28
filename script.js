@@ -12,6 +12,12 @@
   sparkleImg.height = 64;
   const sCtx = sparkleImg.getContext('2d');
 
+  // Blurred sparkle for depth-of-field (far particles)
+  const sparkleImgBlurred = document.createElement('canvas');
+  sparkleImgBlurred.width = 64;
+  sparkleImgBlurred.height = 64;
+  const sCtxBlur = sparkleImgBlurred.getContext('2d');
+
   let W, H, dpr, scale, cx, cy, maxDist;
   const BLOOM_SCALE = 0.15;
   let time = 0;
@@ -40,7 +46,32 @@
     magenta:    '#FF60C0',
   };
 
-  const bgCanvas = document.createElement('canvas'); // keep for compatibility if needed elsewhere, or just remove
+  // Depth-of-field configuration (0.0 = far, 1.0 = close)
+  const DEPTH = {
+    backgroundOrbs:   0.10,
+    mandalaStreams:    0.30,
+    spiralStreams:     0.35,
+    roseCurves:       0.40,
+    lissajousPatterns:0.45,
+    epicycloidStreams: 0.50,
+    radialStreams:     0.55,
+    heartOutline:     0.60,
+    breathingWaves:   0.70,
+    fibonacciSpirals: 0.80,
+    sparkles:         0.85,
+    orbitalSparkles:  0.90,
+    coreGlow:         1.00,
+  };
+
+  function depthMult(depth) {
+    return {
+      size:  0.65 + 0.35 * depth,
+      alpha: 0.50 + 0.50 * depth,
+      blurred: depth < 0.4,
+    };
+  }
+
+  const bgCanvas = document.createElement('canvas');
   const bgCtx = bgCanvas.getContext('2d');
 
   function hexToRgba(hex, alpha) {
@@ -93,6 +124,16 @@
     sGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     sCtx.fillStyle = sGrad;
     sCtx.fillRect(0, 0, 64, 64);
+
+    // Blurred sparkle for far depth-of-field particles
+    sCtxBlur.clearRect(0, 0, 64, 64);
+    const sGradBlur = sCtxBlur.createRadialGradient(32, 32, 0, 32, 32, 32);
+    sGradBlur.addColorStop(0, hexToRgba(HEART_PALETTE.core, 0.6));
+    sGradBlur.addColorStop(0.08, hexToRgba(HEART_PALETTE.innerGlow, 0.5));
+    sGradBlur.addColorStop(0.25, hexToRgba(HEART_PALETTE.midEnergy, 0.3));
+    sGradBlur.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    sCtxBlur.fillStyle = sGradBlur;
+    sCtxBlur.fillRect(0, 0, 64, 64);
   }
 
   function heartX(t) {
@@ -213,18 +254,37 @@
     ctx.stroke();
   }
 
+  // Comet trail: draws fading sparkle stamps from tail to head
+  function drawCometTrail(trailPoints, baseSize, baseAlpha, useBlurred) {
+    const tex = useBlurred ? sparkleImgBlurred : sparkleImg;
+    const len = trailPoints.length;
+    for (let i = len - 1; i >= 0; i--) {
+      const frac = 1 - (i / (len - 1));          // 1.0 at head, 0.0 at tail
+      const size = baseSize * (0.3 + 0.7 * frac); // tapers toward tail
+      const alpha = baseAlpha * frac * frac;       // quadratic falloff
+      if (alpha < 0.01) continue;
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(tex,
+        trailPoints[i].x - size * 4,
+        trailPoints[i].y - size * 4,
+        size * 8, size * 8
+      );
+    }
+  }
+
   function drawBackground(t) {
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, W, H);
 
     ctx.globalCompositeOperation = 'lighter';
 
+    const dm = depthMult(DEPTH.backgroundOrbs);
     // Dynamic, color-syncing fog using slightly darker edge hues to make heart pop
     const orbs = [
-        { px: cx + Math.sin(t*0.2) * W*0.2, py: cy + Math.cos(t*0.26) * H*0.2, size: Math.max(W, H)*0.5, hex: HEART_PALETTE.edgeFade, a: 0.10 },
-        { px: cx + Math.cos(t*0.24) * W*0.25, py: cy + Math.sin(t*0.2) * H*0.3, size: Math.max(W, H)*0.4, hex: HEART_PALETTE.innerGlow, a: 0.08 },
-        { px: cx - Math.sin(t*0.16) * W*0.3, py: cy - Math.cos(t*0.3) * H*0.2, size: Math.max(W, H)*0.45, hex: HEART_PALETTE.outerLines, a: 0.10 },
-        { px: cx, py: cy, size: Math.max(W, H)*0.35, hex: HEART_PALETTE.midEnergy, a: 0.05 }, // Soft central glow
+        { px: cx + Math.sin(t*0.2) * W*0.2, py: cy + Math.cos(t*0.26) * H*0.2, size: Math.max(W, H)*0.5 * dm.size, hex: HEART_PALETTE.edgeFade, a: 0.10 * dm.alpha },
+        { px: cx + Math.cos(t*0.24) * W*0.25, py: cy + Math.sin(t*0.2) * H*0.3, size: Math.max(W, H)*0.4 * dm.size, hex: HEART_PALETTE.innerGlow, a: 0.08 * dm.alpha },
+        { px: cx - Math.sin(t*0.16) * W*0.3, py: cy - Math.cos(t*0.3) * H*0.2, size: Math.max(W, H)*0.45 * dm.size, hex: HEART_PALETTE.outerLines, a: 0.10 * dm.alpha },
+        { px: cx, py: cy, size: Math.max(W, H)*0.35 * dm.size, hex: HEART_PALETTE.midEnergy, a: 0.05 * dm.alpha },
     ];
 
     for (const orb of orbs) {
@@ -240,8 +300,9 @@
   }
 
   function drawHeartOutlineStreams(t) {
-    const numStreams = 10; 
-    const steps = 70; 
+    const numStreams = 10;
+    const steps = 70;
+    const dm = depthMult(DEPTH.heartOutline);
 
     for (let s = 0; s < numStreams; s++) {
       const scaleFactor = 0.7 + (s / numStreams) * 0.35;
@@ -267,16 +328,17 @@
         points.push([cx + hx * scale, cy + hy * scale]);
       }
 
-      const alpha = 0.25 + 0.10 * Math.sin(s * 0.3 + t * 0.2); 
-      const lw = 1.8 + Math.sin(s * 0.8 + t * 0.2) * 0.8; 
+      const alpha = (0.25 + 0.10 * Math.sin(s * 0.3 + t * 0.2)) * dm.alpha;
+      const lw = (1.8 + Math.sin(s * 0.8 + t * 0.2) * 0.8) * dm.size;
       drawStream(points, alpha, lw);
     }
   }
 
   function drawMandalaStreams(t) {
     const numPetals = 10;
-    const numLayers = 2; 
-    const steps = 60; 
+    const numLayers = 2;
+    const steps = 60;
+    const dm = depthMult(DEPTH.mandalaStreams);
 
     for (let layer = 0; layer < numLayers; layer++) {
       const layerScale = 0.2 + (layer / numLayers) * 0.75;
@@ -300,16 +362,17 @@
           points.push([cx + fx * scale, cy + fy * scale]);
         }
 
-        const alpha = 0.20 + 0.08 * Math.sin(layer * 0.5 + petal * 0.3 + t * 0.2); 
-        const lw = 1.5 + 0.6 * Math.sin(layer + t * 0.1);
+        const alpha = (0.20 + 0.08 * Math.sin(layer * 0.5 + petal * 0.3 + t * 0.2)) * dm.alpha;
+        const lw = (1.5 + 0.6 * Math.sin(layer + t * 0.1)) * dm.size;
         drawStream(points, alpha, lw);
       }
     }
   }
 
   function drawSpiralStreams(t) {
-    const numSpirals = 6; 
-    const steps = 100; 
+    const numSpirals = 6;
+    const steps = 100;
+    const dm = depthMult(DEPTH.spiralStreams);
 
     for (let s = 0; s < numSpirals; s++) {
       const phaseOff = (s / numSpirals) * Math.PI * 2;
@@ -326,15 +389,16 @@
         points.push([cx + (hx + modX) * scale, cy + (hy + modY) * scale]);
       }
 
-      const alpha = 0.25 + 0.10 * Math.sin(s * 0.5 + t * 0.2);
-      const lw = 1.6 + 0.8 * Math.sin(s * 0.6 + t * 0.1);
+      const alpha = (0.25 + 0.10 * Math.sin(s * 0.5 + t * 0.2)) * dm.alpha;
+      const lw = (1.6 + 0.8 * Math.sin(s * 0.6 + t * 0.1)) * dm.size;
       drawStream(points, alpha, lw);
     }
   }
 
   function drawRadialStreams(t) {
-    const numRays = 10; 
-    const steps = 50; 
+    const numRays = 10;
+    const steps = 50;
+    const dm = depthMult(DEPTH.radialStreams);
 
     for (let r = 0; r < numRays; r++) {
       const angle = (r / numRays) * Math.PI * 2 + t * 0.08;
@@ -355,17 +419,16 @@
         points.push([cx + fx * scale, cy + fy * scale]);
       }
 
-      const alpha = 0.35 + 0.15 * Math.sin(r * 0.9 + t * 0.3);
-      drawStream(points, alpha, 2.0);
+      const alpha = (0.35 + 0.15 * Math.sin(r * 0.9 + t * 0.3)) * dm.alpha;
+      drawStream(points, alpha, 2.0 * dm.size);
     }
   }
 
   function drawCore(t) {
-    // Removed bright core - mathematical patterns are now the focus
-    // Just a tiny subtle center point for reference
-    ctx.globalAlpha = 0.3;
+    const dm = depthMult(DEPTH.coreGlow);
+    ctx.globalAlpha = 0.3 * dm.alpha;
     const pulse = 1 + Math.sin(t * 1.5) * 0.2;
-    const coreSize = Math.min(W, H) * 0.015 * pulse;
+    const coreSize = Math.min(W, H) * 0.015 * pulse * dm.size;
 
     const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreSize * 3);
     coreGrad.addColorStop(0, 'rgba(255, 240, 220, 0.4)');
@@ -382,6 +445,7 @@
   function drawEpicycloidStreams(t) {
     const numOrbits = 3;
     const steps = 90;
+    const dm = depthMult(DEPTH.epicycloidStreams);
 
     for (let o = 0; o < numOrbits; o++) {
       const R = 7 + o * 1.8;
@@ -403,58 +467,60 @@
         points.push([cx + fx, cy + fy]);
       }
 
-      const alpha = 0.20 + 0.10 * Math.sin(o * 0.7 + t * 0.3);
-      const lw = 1.6 + o * 0.3;
+      const alpha = (0.20 + 0.10 * Math.sin(o * 0.7 + t * 0.3)) * dm.alpha;
+      const lw = (1.6 + o * 0.3) * dm.size;
       drawStream(points, alpha, lw);
     }
   }
 
-  // Beautiful Fibonacci spirals with flowing particles
+  // Pure position function for Fibonacci particles (enables comet trails)
+  function getFibonacciPos(arm, i, numArms, particlesPerArm, t) {
+    const armAngle = (arm / numArms) * Math.PI * 2;
+    const armPhase = t * 0.08 + arm * 0.5;
+    const progress = i / particlesPerArm;
+    const angle = armAngle + progress * Math.PI * 4 + armPhase;
+    const spiralScl = 0.3 + progress * 0.6;
+    let [sx, sy] = fibonacciSpiral(angle, spiralScl * 12);
+    const flow = fourierWave(angle, [
+      {freq: 2, amp: 0.8, phase: t * 0.3 + arm},
+      {freq: 3, amp: 0.4, phase: t * 0.2}
+    ]);
+    sx += flow * 1.5;
+    sy += flow * 1.5;
+    return { x: cx + sx * scale, y: cy + sy * scale, progress };
+  }
+
+  // Beautiful Fibonacci spirals with flowing comet particles
   function drawFibonacciSpirals(t) {
     const numArms = 4;
     const particlesPerArm = 16;
+    const TRAIL_COUNT = 6;
+    const TRAIL_DT = 0.04;
+    const dm = depthMult(DEPTH.fibonacciSpirals);
 
     for (let arm = 0; arm < numArms; arm++) {
-      const armAngle = (arm / numArms) * Math.PI * 2;
-      const armPhase = t * 0.08 + arm * 0.5;
-
       for (let i = 0; i < particlesPerArm; i++) {
-        const progress = i / particlesPerArm;
-        const angle = armAngle + progress * Math.PI * 4 + armPhase;
-        const spiralScale = 0.3 + progress * 0.6;
+        // Build trail by evaluating position at past times
+        const trail = [];
+        for (let ti = 0; ti < TRAIL_COUNT; ti++) {
+          trail.push(getFibonacciPos(arm, i, numArms, particlesPerArm, t - ti * TRAIL_DT));
+        }
 
-        let [sx, sy] = fibonacciSpiral(angle, spiralScale * 12);
-
-        // Flowing harmonics
-        const harmonics = [
-          {freq: 2, amp: 0.8, phase: t * 0.3 + arm},
-          {freq: 3, amp: 0.4, phase: t * 0.2}
-        ];
-        const flow = fourierWave(angle, harmonics);
-
-        sx += flow * 1.5;
-        sy += flow * 1.5;
-
-        const px = cx + sx * scale;
-        const py = cy + sy * scale;
-
-        // Pulsing, flowing particles
+        const head = trail[0];
+        const progress = head.progress;
         const pulse = 0.6 + 0.4 * Math.sin(progress * Math.PI * 3 + t * 0.5 + arm);
-        const size = (2 + progress * 1.5) * pulse;
-        const alpha = (0.50 + 0.25 * Math.sin(i * 0.8 + t * 0.4)) * pulse;
+        const size = (2 + progress * 1.5) * pulse * dm.size;
+        const alpha = (0.50 + 0.25 * Math.sin(i * 0.8 + t * 0.4)) * pulse * dm.alpha;
 
+        // Draw comet trail
+        drawCometTrail(trail, size * 0.8, alpha, dm.blurred);
+
+        // Bright head dot
         ctx.globalAlpha = alpha;
         ctx.fillStyle = globalColorGrad;
         ctx.beginPath();
-        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.arc(head.x, head.y, size, 0, Math.PI * 2);
         ctx.fill();
-
-        // Add trailing glow
-        const glowGrad = ctx.createRadialGradient(px, py, 0, px, py, size * 3);
-        glowGrad.addColorStop(0, `rgba(255, 200, 100, ${alpha * 0.5})`);
-        glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = glowGrad;
-        ctx.fillRect(px - size * 3, py - size * 3, size * 6, size * 6);
       }
     }
   }
@@ -463,6 +529,7 @@
   function drawLissajousPatterns(t) {
     const numPatterns = 3;
     const steps = 100;
+    const dm = depthMult(DEPTH.lissajousPatterns);
     // Mix dynamic palette colors with accent colors
     const colors = [
       HEART_PALETTE.midEnergy,  // Current palette mid-tone
@@ -495,8 +562,8 @@
         points.push([cx + fx, cy + fy]);
       }
 
-      const alpha = 0.25 + 0.12 * Math.sin(p * 0.6 + t * 0.25);
-      const lw = 1.8 + 0.6 * Math.sin(t * 0.3 + p);
+      const alpha = (0.25 + 0.12 * Math.sin(p * 0.6 + t * 0.25)) * dm.alpha;
+      const lw = (1.8 + 0.6 * Math.sin(t * 0.3 + p)) * dm.size;
 
       // Use specific color for each pattern
       ctx.strokeStyle = colors[p];
@@ -509,6 +576,7 @@
   function drawRoseCurves(t) {
     const numRoses = 2;
     const steps = 120;
+    const dm = depthMult(DEPTH.roseCurves);
 
     for (let r = 0; r < numRoses; r++) {
       const n = 5 + r * 2;  // Number of petals
@@ -536,8 +604,8 @@
         points.push([cx + fx, cy + fy]);
       }
 
-      const alpha = 0.30 + 0.15 * Math.sin(r * 0.8 + t * 0.3);
-      const lw = 1.6 + 0.5 * Math.sin(t * 0.2);
+      const alpha = (0.30 + 0.15 * Math.sin(r * 0.8 + t * 0.3)) * dm.alpha;
+      const lw = (1.6 + 0.5 * Math.sin(t * 0.2)) * dm.size;
       drawStream(points, alpha, lw);
     }
   }
@@ -546,6 +614,7 @@
   function drawBreathingWaves(t) {
     const numWaves = 35;
     const numLayers = 2;
+    const dm = depthMult(DEPTH.breathingWaves);
 
     for (let layer = 0; layer < numLayers; layer++) {
       const layerPhase = (layer / numLayers) * Math.PI * 2;
@@ -568,8 +637,8 @@
 
         // Pulsing particle
         const pulse = 0.5 + 0.5 * Math.sin(w * 0.8 + t * 0.5 + layer);
-        const size = (1.5 + layer * 0.5) * pulse;
-        const alpha = (0.4 + 0.2 * pulse) / (layer + 1);
+        const size = (1.5 + layer * 0.5) * pulse * dm.size;
+        const alpha = ((0.4 + 0.2 * pulse) / (layer + 1)) * dm.alpha;
 
         // Color variation using current palette
         const colorMix = (w / numWaves + t * 0.05) % 1;
@@ -593,47 +662,57 @@
     }
   }
 
-  // Very subtle orbital sparkles
+  // Pure position function for orbital sparkles (enables comet trails)
+  function getOrbitalPos(orbit, p, numOrbits, particlesPerOrbit, t) {
+    const a = 8 + orbit * 1.5;
+    const e = 0.2;
+    const omega = (orbit / numOrbits) * Math.PI * 2;
+    const meanAnomaly = (p / particlesPerOrbit) * Math.PI * 2 + t * (0.15 + orbit * 0.03);
+    const E = meanAnomaly + e * Math.sin(meanAnomaly);
+    const trueAnomaly = 2 * Math.atan2(
+      Math.sqrt(1 + e) * Math.sin(E / 2),
+      Math.sqrt(1 - e) * Math.cos(E / 2)
+    );
+    const r = a * (1 - e * Math.cos(E));
+    const orbX = r * Math.cos(trueAnomaly);
+    const orbY = r * Math.sin(trueAnomaly);
+    return {
+      x: cx + (orbX * Math.cos(omega) - orbY * Math.sin(omega)) * scale,
+      y: cy + (orbX * Math.sin(omega) + orbY * Math.cos(omega)) * scale,
+      r, a
+    };
+  }
+
+  // Orbital sparkles with comet trails
   function drawOrbitalSparkles(t) {
-    const numOrbits = 3;  // Reduced from 6
-    const particlesPerOrbit = 4;  // Reduced from 3
+    const numOrbits = 3;
+    const particlesPerOrbit = 4;
+    const TRAIL_COUNT = 7;
+    const TRAIL_DT = 0.035;
+    const dm = depthMult(DEPTH.orbitalSparkles);
 
     for (let orbit = 0; orbit < numOrbits; orbit++) {
-      const a = 8 + orbit * 1.5;  // Smaller orbits
-      const e = 0.2;  // Less eccentric
-      const omega = (orbit / numOrbits) * Math.PI * 2;
-
       for (let p = 0; p < particlesPerOrbit; p++) {
-        const meanAnomaly = (p / particlesPerOrbit) * Math.PI * 2 + t * (0.15 + orbit * 0.03);
+        // Build trail by evaluating position at past times
+        const trail = [];
+        for (let ti = 0; ti < TRAIL_COUNT; ti++) {
+          trail.push(getOrbitalPos(orbit, p, numOrbits, particlesPerOrbit, t - ti * TRAIL_DT));
+        }
 
-        const E = meanAnomaly + e * Math.sin(meanAnomaly);
-        const trueAnomaly = 2 * Math.atan2(
-          Math.sqrt(1 + e) * Math.sin(E / 2),
-          Math.sqrt(1 - e) * Math.cos(E / 2)
-        );
+        const head = trail[0];
+        const velocity = Math.sqrt(2 / head.r - 1 / head.a);
+        const brightness = 0.3 + velocity * 0.3;
+        const size = (1 + brightness) * dm.size;
 
-        const r = a * (1 - e * Math.cos(E));
-        const orbX = r * Math.cos(trueAnomaly);
-        const orbY = r * Math.sin(trueAnomaly);
-
-        const rx = orbX * Math.cos(omega) - orbY * Math.sin(omega);
-        const ry = orbX * Math.sin(omega) + orbY * Math.cos(omega);
-
-        const px = cx + rx * scale;
-        const py = cy + ry * scale;
-
-        const velocity = Math.sqrt(2 / r - 1 / a);
-        const brightness = 0.3 + velocity * 0.3;  // Dimmer
-        const size = 1 + brightness;
-
-        ctx.globalAlpha = brightness * 0.4;  // Much more subtle
-        ctx.drawImage(sparkleImg, px - size * 4, py - size * 4, size * 8, size * 8);
+        drawCometTrail(trail, size, brightness * 0.4 * dm.alpha, dm.blurred);
       }
     }
   }
 
   function drawSparkles(t) {
-    const numSparkles = 60; 
+    const numSparkles = 60;
+    const dm = depthMult(DEPTH.sparkles);
+    const tex = dm.blurred ? sparkleImgBlurred : sparkleImg;
     ctx.globalCompositeOperation = 'lighter';
 
     for (let i = 0; i < numSparkles; i++) {
@@ -647,13 +726,13 @@
       const sx = cx + (hx + jx) * scale;
       const sy = cy + (hy + jy) * scale;
 
-      const twinkle = 0.5 + 0.5 * Math.sin(i * 3.1 + t * 0.5); 
-      ctx.globalAlpha = twinkle * 0.9;
-      
-      const r = 0.6 + twinkle * 1.5; 
-      const size = r * 12; 
-      
-      ctx.drawImage(sparkleImg, sx - size / 2, sy - size / 2, size, size);
+      const twinkle = 0.5 + 0.5 * Math.sin(i * 3.1 + t * 0.5);
+      ctx.globalAlpha = twinkle * 0.9 * dm.alpha;
+
+      const r = (0.6 + twinkle * 1.5) * dm.size;
+      const size = r * 12;
+
+      ctx.drawImage(tex, sx - size / 2, sy - size / 2, size, size);
     }
   }
 
