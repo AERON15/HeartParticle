@@ -55,11 +55,14 @@
   const NEBULA_ROTATION_SPEED = 0.000018; 
   const NEBULA_DRIFT_X = 0.004;
 
-  const PERF = { tier: 3, lastCheck: 0, frameCount: 0, fps: 60 };
+  const _isMobile = /Android|iPhone|iPad|iPod|Tablet|Mobile/i.test(navigator.userAgent)
+    || ('ontouchstart' in window && window.innerWidth < 1200);
+
+  const PERF = { tier: _isMobile ? 1 : 3, lastCheck: 0, frameCount: 0, fps: 60 };
   const QUALITY_TIERS = {
     3: { dustMult: 1.0, starMult: 1.0, flareCount: 15, milkyWayMult: 1.0 },
     2: { dustMult: 0.6, starMult: 0.8, flareCount: 8,  milkyWayMult: 0.7 },
-    1: { dustMult: 0.3, starMult: 0.5, flareCount: 4,  milkyWayMult: 0.4 },
+    1: { dustMult: 0.2, starMult: 0.35, flareCount: 3,  milkyWayMult: 0.25 },
   };
 
   let mainCanvas, mainCtx;
@@ -304,7 +307,9 @@
     mainCanvas.height = H;
     
     // Make nebula target size the diagonal so it doesn't clip when rendered natively centered
-    const maxSize = Math.sqrt(W*W + H*H); 
+    // On mobile, use a smaller buffer to save memory and fill time
+    const diag = Math.sqrt(W*W + H*H);
+    const maxSize = _isMobile ? Math.floor(diag * 0.6) : diag;
     nebulaOffscreen.width = maxSize;
     nebulaOffscreen.height = maxSize;
     
@@ -394,13 +399,18 @@
     starFieldOffscreen = document.createElement('canvas');
     starOffCtx = starFieldOffscreen.getContext('2d');
 
-    twinkleGroups = [
-      { speed: 0.0003, phase: 0, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
-      { speed: 0.0004, phase: 2, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
-      { speed: 0.0005, phase: 4, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
-      { speed: 0.0002, phase: 1, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
-      { speed: 0.0006, phase: 3, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
-    ];
+    twinkleGroups = _isMobile
+      ? [
+          { speed: 0.0003, phase: 0, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
+          { speed: 0.0005, phase: 4, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
+        ]
+      : [
+          { speed: 0.0003, phase: 0, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
+          { speed: 0.0004, phase: 2, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
+          { speed: 0.0005, phase: 4, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
+          { speed: 0.0002, phase: 1, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
+          { speed: 0.0006, phase: 3, canvas: document.createElement('canvas'), ctx: null, lastAlpha: 0 },
+        ];
     twinkleGroups.forEach(g => { g.ctx = g.canvas.getContext('2d'); });
 
     rebakeWithTier(QUALITY_TIERS[PERF.tier]);
