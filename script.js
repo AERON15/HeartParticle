@@ -259,15 +259,15 @@
     const tex = useBlurred ? sparkleImgBlurred : sparkleImg;
     const len = trailPoints.length;
     for (let i = len - 1; i >= 0; i--) {
-      const frac = 1 - (i / (len - 1));          // 1.0 at head, 0.0 at tail
-      const size = baseSize * (0.3 + 0.7 * frac); // tapers toward tail
-      const alpha = baseAlpha * frac * frac;       // quadratic falloff
-      if (alpha < 0.01) continue;
+      const frac = 1 - (i / (len - 1));            // 1.0 at head, 0.0 at tail
+      const size = baseSize * (0.15 + 0.85 * frac); // tapers more toward tail
+      const alpha = baseAlpha * Math.sqrt(frac);     // sqrt falloff (gentler, more visible tail)
+      if (alpha < 0.005) continue;
       ctx.globalAlpha = alpha;
       ctx.drawImage(tex,
-        trailPoints[i].x - size * 4,
-        trailPoints[i].y - size * 4,
-        size * 8, size * 8
+        trailPoints[i].x - size * 5,
+        trailPoints[i].y - size * 5,
+        size * 10, size * 10
       );
     }
   }
@@ -494,8 +494,8 @@
   function drawFibonacciSpirals(t) {
     const numArms = 4;
     const particlesPerArm = 16;
-    const TRAIL_COUNT = 6;
-    const TRAIL_DT = 0.04;
+    const TRAIL_COUNT = 8;
+    const TRAIL_DT = 0.1;
     const dm = depthMult(DEPTH.fibonacciSpirals);
 
     for (let arm = 0; arm < numArms; arm++) {
@@ -509,11 +509,11 @@
         const head = trail[0];
         const progress = head.progress;
         const pulse = 0.6 + 0.4 * Math.sin(progress * Math.PI * 3 + t * 0.5 + arm);
-        const size = (2 + progress * 1.5) * pulse * dm.size;
-        const alpha = (0.50 + 0.25 * Math.sin(i * 0.8 + t * 0.4)) * pulse * dm.alpha;
+        const size = (2.5 + progress * 2) * pulse * dm.size;
+        const alpha = (0.60 + 0.25 * Math.sin(i * 0.8 + t * 0.4)) * pulse * dm.alpha;
 
         // Draw comet trail
-        drawCometTrail(trail, size * 0.8, alpha, dm.blurred);
+        drawCometTrail(trail, size, alpha, dm.blurred);
 
         // Bright head dot
         ctx.globalAlpha = alpha;
@@ -687,8 +687,8 @@
   function drawOrbitalSparkles(t) {
     const numOrbits = 3;
     const particlesPerOrbit = 4;
-    const TRAIL_COUNT = 7;
-    const TRAIL_DT = 0.035;
+    const TRAIL_COUNT = 10;
+    const TRAIL_DT = 0.12;
     const dm = depthMult(DEPTH.orbitalSparkles);
 
     for (let orbit = 0; orbit < numOrbits; orbit++) {
@@ -702,9 +702,9 @@
         const head = trail[0];
         const velocity = Math.sqrt(2 / head.r - 1 / head.a);
         const brightness = 0.3 + velocity * 0.3;
-        const size = (1 + brightness) * dm.size;
+        const size = (1.5 + brightness * 1.5) * dm.size;
 
-        drawCometTrail(trail, size, brightness * 0.4 * dm.alpha, dm.blurred);
+        drawCometTrail(trail, size, (brightness * 0.7) * dm.alpha, dm.blurred);
       }
     }
   }
