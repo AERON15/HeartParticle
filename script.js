@@ -1,6 +1,6 @@
 (function () {
   const canvas = document.getElementById('heart');
-  const ctx = canvas.getContext('2d', { alpha: true });
+  const ctx = canvas.getContext('2d', { alpha: true }); 
 
   const bloomA = document.createElement('canvas');
   const bCtxA = bloomA.getContext('2d');
@@ -11,44 +11,6 @@
   sparkleImg.width = 64;
   sparkleImg.height = 64;
   const sCtx = sparkleImg.getContext('2d');
-
-  // --- Mobile/tablet detection & performance tier ---
-  const isMobile = /Android|iPhone|iPad|iPod|Tablet|Mobile/i.test(navigator.userAgent)
-    || ('ontouchstart' in window && window.innerWidth < 1200);
-
-  const PERF = isMobile
-    ? {
-        heartStreams: 5, heartSteps: 40,
-        mandalaPetals: 5, mandalaLayers: 1, mandalaSteps: 35,
-        spirals: 3, spiralSteps: 50,
-        rays: 5, raySteps: 30,
-        epicycloidOrbits: 2, epicycloidSteps: 50,
-        fibArms: 3, fibParticles: 10,
-        lissajousPatterns: 2, lissajousSteps: 60,
-        roses: 1, roseSteps: 70,
-        breathingWaves: 18, breathingLayers: 1,
-        sparkles: 30,
-        orbitalOrbits: 2, orbitalParticles: 3,
-        bloomEnabled: false,
-        bgOrbs: 2,
-        alphaBoost: 1.5,   // boost vibrancy on mobile
-      }
-    : {
-        heartStreams: 10, heartSteps: 70,
-        mandalaPetals: 10, mandalaLayers: 2, mandalaSteps: 60,
-        spirals: 6, spiralSteps: 100,
-        rays: 10, raySteps: 50,
-        epicycloidOrbits: 3, epicycloidSteps: 90,
-        fibArms: 4, fibParticles: 16,
-        lissajousPatterns: 3, lissajousSteps: 100,
-        roses: 2, roseSteps: 120,
-        breathingWaves: 35, breathingLayers: 2,
-        sparkles: 60,
-        orbitalOrbits: 3, orbitalParticles: 4,
-        bloomEnabled: true,
-        bgOrbs: 4,
-        alphaBoost: 1.0,
-      };
 
   let W, H, dpr, scale, cx, cy, maxDist;
   const BLOOM_SCALE = 0.15;
@@ -92,8 +54,7 @@
 
   function resize() {
     dpr = window.devicePixelRatio || 1;
-    if (isMobile) { dpr = Math.min(dpr, 1.5); }
-    else if (dpr > 2) dpr = 2;
+    if (dpr > 2) dpr = 2; 
 
     W = window.innerWidth;
     H = window.innerHeight;
@@ -258,31 +219,29 @@
 
     ctx.globalCompositeOperation = 'lighter';
 
-    const ab = PERF.alphaBoost;
     // Dynamic, color-syncing fog using slightly darker edge hues to make heart pop
-    const allOrbs = [
-        { px: cx + Math.sin(t*0.2) * W*0.2, py: cy + Math.cos(t*0.26) * H*0.2, size: Math.max(W, H)*0.5, hex: HEART_PALETTE.edgeFade, a: 0.10 * ab },
-        { px: cx + Math.cos(t*0.24) * W*0.25, py: cy + Math.sin(t*0.2) * H*0.3, size: Math.max(W, H)*0.4, hex: HEART_PALETTE.innerGlow, a: 0.08 * ab },
-        { px: cx - Math.sin(t*0.16) * W*0.3, py: cy - Math.cos(t*0.3) * H*0.2, size: Math.max(W, H)*0.45, hex: HEART_PALETTE.outerLines, a: 0.10 * ab },
-        { px: cx, py: cy, size: Math.max(W, H)*0.35, hex: HEART_PALETTE.midEnergy, a: 0.05 * ab },
+    const orbs = [
+        { px: cx + Math.sin(t*0.2) * W*0.2, py: cy + Math.cos(t*0.26) * H*0.2, size: Math.max(W, H)*0.5, hex: HEART_PALETTE.edgeFade, a: 0.10 },
+        { px: cx + Math.cos(t*0.24) * W*0.25, py: cy + Math.sin(t*0.2) * H*0.3, size: Math.max(W, H)*0.4, hex: HEART_PALETTE.innerGlow, a: 0.08 },
+        { px: cx - Math.sin(t*0.16) * W*0.3, py: cy - Math.cos(t*0.3) * H*0.2, size: Math.max(W, H)*0.45, hex: HEART_PALETTE.outerLines, a: 0.10 },
+        { px: cx, py: cy, size: Math.max(W, H)*0.35, hex: HEART_PALETTE.midEnergy, a: 0.05 }, // Soft central glow
     ];
 
-    const orbCount = PERF.bgOrbs;
-    for (let i = 0; i < orbCount; i++) {
-        const orb = allOrbs[i];
+    for (const orb of orbs) {
         const grad = ctx.createRadialGradient(orb.px, orb.py, 0, orb.px, orb.py, orb.size);
         grad.addColorStop(0, hexToRgba(orb.hex, orb.a));
+        // Use a 50% opacity fade in the middle before dropping to 0
         grad.addColorStop(0.5, hexToRgba(orb.hex, orb.a * 0.4));
         grad.addColorStop(1, 'rgba(0,0,0,0)');
-
+        
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
     }
   }
 
   function drawHeartOutlineStreams(t) {
-    const numStreams = PERF.heartStreams;
-    const steps = PERF.heartSteps;
+    const numStreams = 10; 
+    const steps = 70; 
 
     for (let s = 0; s < numStreams; s++) {
       const scaleFactor = 0.7 + (s / numStreams) * 0.35;
@@ -308,16 +267,16 @@
         points.push([cx + hx * scale, cy + hy * scale]);
       }
 
-      const alpha = Math.min(1, (0.25 + 0.10 * Math.sin(s * 0.3 + t * 0.2)) * PERF.alphaBoost);
-      const lw = 1.8 + Math.sin(s * 0.8 + t * 0.2) * 0.8;
+      const alpha = 0.25 + 0.10 * Math.sin(s * 0.3 + t * 0.2); 
+      const lw = 1.8 + Math.sin(s * 0.8 + t * 0.2) * 0.8; 
       drawStream(points, alpha, lw);
     }
   }
 
   function drawMandalaStreams(t) {
-    const numPetals = PERF.mandalaPetals;
-    const numLayers = PERF.mandalaLayers;
-    const steps = PERF.mandalaSteps;
+    const numPetals = 10;
+    const numLayers = 2; 
+    const steps = 60; 
 
     for (let layer = 0; layer < numLayers; layer++) {
       const layerScale = 0.2 + (layer / numLayers) * 0.75;
@@ -341,7 +300,7 @@
           points.push([cx + fx * scale, cy + fy * scale]);
         }
 
-        const alpha = Math.min(1, (0.20 + 0.08 * Math.sin(layer * 0.5 + petal * 0.3 + t * 0.2)) * PERF.alphaBoost);
+        const alpha = 0.20 + 0.08 * Math.sin(layer * 0.5 + petal * 0.3 + t * 0.2); 
         const lw = 1.5 + 0.6 * Math.sin(layer + t * 0.1);
         drawStream(points, alpha, lw);
       }
@@ -349,8 +308,8 @@
   }
 
   function drawSpiralStreams(t) {
-    const numSpirals = PERF.spirals;
-    const steps = PERF.spiralSteps;
+    const numSpirals = 6; 
+    const steps = 100; 
 
     for (let s = 0; s < numSpirals; s++) {
       const phaseOff = (s / numSpirals) * Math.PI * 2;
@@ -367,15 +326,15 @@
         points.push([cx + (hx + modX) * scale, cy + (hy + modY) * scale]);
       }
 
-      const alpha = Math.min(1, (0.25 + 0.10 * Math.sin(s * 0.5 + t * 0.2)) * PERF.alphaBoost);
+      const alpha = 0.25 + 0.10 * Math.sin(s * 0.5 + t * 0.2);
       const lw = 1.6 + 0.8 * Math.sin(s * 0.6 + t * 0.1);
       drawStream(points, alpha, lw);
     }
   }
 
   function drawRadialStreams(t) {
-    const numRays = PERF.rays;
-    const steps = PERF.raySteps;
+    const numRays = 10; 
+    const steps = 50; 
 
     for (let r = 0; r < numRays; r++) {
       const angle = (r / numRays) * Math.PI * 2 + t * 0.08;
@@ -396,7 +355,7 @@
         points.push([cx + fx * scale, cy + fy * scale]);
       }
 
-      const alpha = Math.min(1, (0.35 + 0.15 * Math.sin(r * 0.9 + t * 0.3)) * PERF.alphaBoost);
+      const alpha = 0.35 + 0.15 * Math.sin(r * 0.9 + t * 0.3);
       drawStream(points, alpha, 2.0);
     }
   }
@@ -421,8 +380,8 @@
 
   // Enhanced epicycloid patterns - multiple beautiful orbits
   function drawEpicycloidStreams(t) {
-    const numOrbits = PERF.epicycloidOrbits;
-    const steps = PERF.epicycloidSteps;
+    const numOrbits = 3;
+    const steps = 90;
 
     for (let o = 0; o < numOrbits; o++) {
       const R = 7 + o * 1.8;
@@ -444,7 +403,7 @@
         points.push([cx + fx, cy + fy]);
       }
 
-      const alpha = Math.min(1, (0.20 + 0.10 * Math.sin(o * 0.7 + t * 0.3)) * PERF.alphaBoost);
+      const alpha = 0.20 + 0.10 * Math.sin(o * 0.7 + t * 0.3);
       const lw = 1.6 + o * 0.3;
       drawStream(points, alpha, lw);
     }
@@ -452,8 +411,8 @@
 
   // Beautiful Fibonacci spirals with flowing particles
   function drawFibonacciSpirals(t) {
-    const numArms = PERF.fibArms;
-    const particlesPerArm = PERF.fibParticles;
+    const numArms = 4;
+    const particlesPerArm = 16;
 
     for (let arm = 0; arm < numArms; arm++) {
       const armAngle = (arm / numArms) * Math.PI * 2;
@@ -484,28 +443,26 @@
         const size = (2 + progress * 1.5) * pulse;
         const alpha = (0.50 + 0.25 * Math.sin(i * 0.8 + t * 0.4)) * pulse;
 
-        ctx.globalAlpha = Math.min(1, alpha * PERF.alphaBoost);
+        ctx.globalAlpha = alpha;
         ctx.fillStyle = globalColorGrad;
         ctx.beginPath();
         ctx.arc(px, py, size, 0, Math.PI * 2);
         ctx.fill();
 
-        // Add trailing glow (skip on mobile - expensive per-particle gradient)
-        if (!isMobile) {
-          const glowGrad = ctx.createRadialGradient(px, py, 0, px, py, size * 3);
-          glowGrad.addColorStop(0, `rgba(255, 200, 100, ${alpha * 0.5})`);
-          glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-          ctx.fillStyle = glowGrad;
-          ctx.fillRect(px - size * 3, py - size * 3, size * 6, size * 6);
-        }
+        // Add trailing glow
+        const glowGrad = ctx.createRadialGradient(px, py, 0, px, py, size * 3);
+        glowGrad.addColorStop(0, `rgba(255, 200, 100, ${alpha * 0.5})`);
+        glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = glowGrad;
+        ctx.fillRect(px - size * 3, py - size * 3, size * 6, size * 6);
       }
     }
   }
 
   // Beautiful Lissajous patterns with dynamic color variety
   function drawLissajousPatterns(t) {
-    const numPatterns = PERF.lissajousPatterns;
-    const steps = PERF.lissajousSteps;
+    const numPatterns = 3;
+    const steps = 100;
     // Mix dynamic palette colors with accent colors
     const colors = [
       HEART_PALETTE.midEnergy,  // Current palette mid-tone
@@ -538,7 +495,7 @@
         points.push([cx + fx, cy + fy]);
       }
 
-      const alpha = Math.min(1, (0.25 + 0.12 * Math.sin(p * 0.6 + t * 0.25)) * PERF.alphaBoost);
+      const alpha = 0.25 + 0.12 * Math.sin(p * 0.6 + t * 0.25);
       const lw = 1.8 + 0.6 * Math.sin(t * 0.3 + p);
 
       // Use specific color for each pattern
@@ -550,8 +507,8 @@
 
   // Rose curve patterns with color and breathing effect
   function drawRoseCurves(t) {
-    const numRoses = PERF.roses;
-    const steps = PERF.roseSteps;
+    const numRoses = 2;
+    const steps = 120;
 
     for (let r = 0; r < numRoses; r++) {
       const n = 5 + r * 2;  // Number of petals
@@ -579,7 +536,7 @@
         points.push([cx + fx, cy + fy]);
       }
 
-      const alpha = Math.min(1, (0.30 + 0.15 * Math.sin(r * 0.8 + t * 0.3)) * PERF.alphaBoost);
+      const alpha = 0.30 + 0.15 * Math.sin(r * 0.8 + t * 0.3);
       const lw = 1.6 + 0.5 * Math.sin(t * 0.2);
       drawStream(points, alpha, lw);
     }
@@ -587,8 +544,8 @@
 
   // Breathing wave particles flowing around the heart
   function drawBreathingWaves(t) {
-    const numWaves = PERF.breathingWaves;
-    const numLayers = PERF.breathingLayers;
+    const numWaves = 35;
+    const numLayers = 2;
 
     for (let layer = 0; layer < numLayers; layer++) {
       const layerPhase = (layer / numLayers) * Math.PI * 2;
@@ -638,8 +595,8 @@
 
   // Very subtle orbital sparkles
   function drawOrbitalSparkles(t) {
-    const numOrbits = PERF.orbitalOrbits;
-    const particlesPerOrbit = PERF.orbitalParticles;
+    const numOrbits = 3;  // Reduced from 6
+    const particlesPerOrbit = 4;  // Reduced from 3
 
     for (let orbit = 0; orbit < numOrbits; orbit++) {
       const a = 8 + orbit * 1.5;  // Smaller orbits
@@ -676,7 +633,7 @@
   }
 
   function drawSparkles(t) {
-    const numSparkles = PERF.sparkles;
+    const numSparkles = 60; 
     ctx.globalCompositeOperation = 'lighter';
 
     for (let i = 0; i < numSparkles; i++) {
@@ -728,22 +685,19 @@
     drawOrbitalSparkles(t);          // Orbital mechanics sparkles
     drawCore(t);                     // Subtle center point
 
-    // Bloom pass: skip on mobile for major perf gain
-    if (PERF.bloomEnabled) {
-      const bw = bloomA.width;
-      const bh = bloomA.height;
-      bCtxA.clearRect(0, 0, bw, bh);
-      bCtxA.drawImage(canvas, 0, 0, bw, bh);
+    const bw = bloomA.width;
+    const bh = bloomA.height;
+    bCtxA.clearRect(0, 0, bw, bh);
+    bCtxA.drawImage(canvas, 0, 0, bw, bh);
 
-      bCtxB.clearRect(0, 0, bw, bh);
-      bCtxB.filter = 'blur(4px)';
-      bCtxB.drawImage(bloomA, 0, 0);
-      bCtxB.filter = 'none';
+    bCtxB.clearRect(0, 0, bw, bh);
+    bCtxB.filter = 'blur(4px)'; 
+    bCtxB.drawImage(bloomA, 0, 0);
+    bCtxB.filter = 'none';
 
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.8;
-      ctx.drawImage(bloomB, 0, 0, bw, bh, 0, 0, W, H);
-    }
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.8; 
+    ctx.drawImage(bloomB, 0, 0, bw, bh, 0, 0, W, H);
   }
 
   let lastTime = 0;
